@@ -27,7 +27,13 @@ make init
 ```
 ### Running
 
-Change the experiment parameters in `Makefile`.
+First fetch the data
+
+```
+make fetch-data
+```
+
+Then you can can `main.py` as follows (maybe you may also want to change the experiment parameters in the `Makefile` file)
 
 ```
 make run
@@ -60,9 +66,8 @@ Check out the [blogpost](http://www.dhfromkorea.com/news-recommendation-with-con
 
 
 #### Mushroom Dataset
-A public UCI machine learnign [dataset](https://archive.ics.uci.edu/ml/datasets/mushroom). 
 
-To fetch data, run `make fetch-data`.
+A public UCI machine learning [dataset](https://archive.ics.uci.edu/ml/datasets/mushroom). 
 
 ```python
 

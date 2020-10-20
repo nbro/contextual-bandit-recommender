@@ -21,19 +21,17 @@ lint:
 run:
 	python main.py "synthetic" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS)
 	python main.py "mushroom" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS)
-	python main.py "news" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS) \
-		--is_acp --grad_clip
+	python main.py "news" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS) --is_acp --grad_clip
 
 plot:
-	python evaluations/plotting.py "synthetic" --n_trials $(N_TRIALS) \
-		--window $(WINDOW)
-	python evaluations/plotting.py "mushroom" --n_trials $(N_TRIALS) \
-		--window $(WINDOW)
-	python evaluations/plotting.py "news" --n_trials $(N_TRIALS) \
-		--window $(WINDOW)
+	python evaluations/plotting.py "synthetic" --n_trials $(N_TRIALS) --window $(WINDOW)
+	python evaluations/plotting.py "mushroom" --n_trials $(N_TRIALS) --window $(WINDOW)
+	python evaluations/plotting.py "news" --n_trials $(N_TRIALS) --window $(WINDOW)
 
 fetch-data:
-	wget -O $(MUSHROOM_DEST) $(MUSHROOM_SOURCE)
+# 	wget -O $(MUSHROOM_DEST) $(MUSHROOM_SOURCE)
+	curl $(MUSHROOM_SOURCE) -o $(MUSHROOM_DEST)
+
 
 # asssumes yahoo_data in datautils/news/dataset.tgz
 process-news-data:
@@ -46,13 +44,7 @@ clean-pyc:
 	find . -regex '^.*\(__pycache__\|\.py[co]\)$$' -delete
 
 docker-run:
-	docker build \
-      --file=./Dockerfile \
-      --tag=$(APP_NAME) ./
-	docker run \
-      --detach=false \
-      --name=$(APP_NAME) \
-      --publish=$(HOST):8080 \
-      my_project
+	docker build --file=./Dockerfile --tag=$(APP_NAME) ./
+	docker run --detach=false --name=$(APP_NAME) --publish=$(HOST):8080 my_project
 
 .PHONY: clean-pyc

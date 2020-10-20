@@ -159,6 +159,11 @@ def plot_cumrew(task_name, M_cr_mean, M_cr_std, columns):
     for j in range(M_cr_mean.shape[1]):
         y_mean = M_cr_mean[:, j]
         ax.plot(x, y_mean, label=columns[j], linewidth=1)
+
+        # TODO: the following line causes the error
+        #  TypeError: ufunc 'isfinite' not supported for the input types,
+        #  and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''
+        # TODO: when trying to plot news' results
         ax.fill_between(x, np.maximum(0, low[:, j]), high[:, j], alpha=0.1)
 
     ax.legend(loc="upper left", fontsize=15)

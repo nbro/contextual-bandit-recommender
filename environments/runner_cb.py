@@ -21,8 +21,15 @@ from models.disjoint_contextual_policy import (
 )
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 results_dir = os.path.abspath(os.path.join(root_dir, "results"))
 
+def create_if_not_exists(folder_name):
+    print("Creating folder '{}'...".format(folder_name))
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+
+create_if_not_exists(results_dir)
 
 
 def simulate_cb(data, n_samples, policies):

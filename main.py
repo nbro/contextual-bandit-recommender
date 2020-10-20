@@ -72,12 +72,14 @@ if __name__ == "__main__":
 
     for trial_idx in range(args.n_trials):
         logger.info("{}th trial started".format(trial_idx))
+
         start_t = time.time()
+
         if args.is_acp:
             results, policies, policy_names = run_por_cb(args)
             write_results_por_cb(results, policies, policy_names, trial_idx, args)
         else:
             results, policies, policy_names = run_cb(args)
             write_results_cb(results, policies, policy_names, trial_idx, args)
-        logger.info("{}th trial ended after {:.2f}s".format(trial_idx,
-            time.time() - start_t))
+
+        logger.info("{}th trial ended after {:.2f}s".format(trial_idx, time.time() - start_t))
