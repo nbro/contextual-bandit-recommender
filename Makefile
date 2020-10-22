@@ -6,7 +6,7 @@ MUSHROOM_DEST="./datautils/mushroom/mushroom.csv"
 MUSHROOM_SOURCE="https://archive.ics.uci.edu/ml/machine-learning-databases/mushroom/agaricus-lepiota.data"
 WINDOW=512
 
-N_TRIALS=1
+N_TRIALS=5
 N_ROUNDS=600
 
 init:

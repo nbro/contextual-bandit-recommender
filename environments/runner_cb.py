@@ -6,34 +6,34 @@ import os
 import numpy as np
 import pandas as pd
 
-
-from datautils.synthetic.sample_data import sample_synthetic
 from datautils.mushroom.sample_data import sample_mushroom
 from datautils.preprocessing import load_data
-
+from datautils.synthetic.sample_data import sample_synthetic
 from models.context_free_policy import (
-        EpsilonGreedyPolicy,
-        UCBPolicy,
+    EpsilonGreedyPolicy,
+    UCBPolicy,
 )
 from models.disjoint_contextual_policy import (
-        LinUCBPolicy,
-        LinearGaussianThompsonSamplingPolicy,
+    LinUCBPolicy,
+    LinearGaussianThompsonSamplingPolicy,
 )
 
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 results_dir = os.path.abspath(os.path.join(root_dir, "results"))
 
+
 def create_if_not_exists(folder_name):
     print("Creating folder '{}'...".format(folder_name))
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
 
+
 create_if_not_exists(results_dir)
 
 
 def simulate_cb(data, n_samples, policies):
-    """Simulator for FOR CB problems.
+    """Simulator for for contextual bandit (CB) problems.
 
     Runs n_samples steps.
     """
@@ -41,26 +41,42 @@ def simulate_cb(data, n_samples, policies):
     results = [None] * len(policies)
 
     for i, policy in enumerate(policies):
+
+        # Create a dictionary for policy i where we save different statistics related to it (such as the regret).
         results[i] = {}
+
         # log a_t, r_t, del_t (regret)
         results[i]["log"] = np.zeros((4, n_samples))
 
         t = 0
 
         for x_t, r_acts, a_t_opt, _ in zip(*data):
-            a_t = policy.choose_action(x_t)
-            r_t = r_acts[a_t]
+            a_t = policy.choose_action(x_t)  # x_t is the context at time step t.
+
+            r_t = r_acts[a_t]  # reward for each of the actions.
+
             policy.update(a_t, x_t, r_t)
-            r_t_opt = r_acts[a_t_opt]
+
+            # Get the reward for the optimal action.
+            r_t_opt = r_acts[a_t_opt] # a_t_opt optimal action at time step t.
+
+            # Compute the regret as the difference between the optimal reward and the reward for taking the action
+            # according to the given behaviour policy.
             regret_t = r_t_opt - r_t
 
+            # Save the results for policy i.
             results[i]["log"][:, t] = [a_t, a_t_opt, r_t, regret_t]
 
             t += 1
 
         results[i]["policy"] = policy
+
+        # All regrets for all time steps
         regrets = results[i]["log"][3, :]
+
         results[i]["cum_regret"] = np.cumsum(regrets)
+
+        # ???
         results[i]["simple_regret"] = np.sum(regrets[-500:])
 
     return results
@@ -86,35 +102,44 @@ def run_cb(args):
                                   r_eat_bad_lucky_prob=0.7,
                                   r_no_eat=0.0
                                   )
+        # samples is a tuple
+        # samples[0].shape = (600, 117) => 600 contexts, each of which of 117 dimensions (i.e. the feature vector).
+        # samples[1].shape = (600, 2) => rewards for each of the 2 actions
+        # samples[2].shape = (600,) => optimal action for each of the contexts
+        # samples[3].shape = (600,)
+        # 600 is the number of rounds (args.n_rounds)
 
     elif task == "synthetic":
         n_actions = 5
         context_dim = 10
-        sigma = 1.0 # set low covariance
+        sigma = 1.0  # set low covariance
         samples = sample_synthetic(n_rounds, n_actions, context_dim, sigma)
 
     else:
         raise NotImplementedError
 
     # define a solver
-    egp = EpsilonGreedyPolicy(n_actions, lr=0.001,
-                    epsilon=0.5, eps_anneal_factor=0.001)
-    ucbp = UCBPolicy(n_actions=n_actions, lr=0.001)
-    linucbp = LinUCBPolicy(
-            n_actions=n_actions,
-            context_dim=context_dim,
-            delta=0.001,
-            train_starts_at=100,
-            train_freq=5
-            )
-    lgtsp = LinearGaussianThompsonSamplingPolicy(
-                n_actions=n_actions,
-                context_dim=context_dim,
-                eta_prior=6.0,
-                lambda_prior=0.25,
-                train_starts_at=100,
-                posterior_update_freq=5,
-                lr = 0.05)
+    egp = EpsilonGreedyPolicy(n_actions,
+                              lr=0.001,
+                              epsilon=0.5,
+                              eps_anneal_factor=0.001)
+
+    ucbp = UCBPolicy(n_actions=n_actions,
+                     lr=0.001)
+
+    linucbp = LinUCBPolicy(n_actions=n_actions,
+                           context_dim=context_dim,
+                           delta=0.001,
+                           train_starts_at=100,
+                           train_freq=5)
+
+    lgtsp = LinearGaussianThompsonSamplingPolicy(n_actions=n_actions,
+                                                 context_dim=context_dim,
+                                                 eta_prior=6.0,
+                                                 lambda_prior=0.25,
+                                                 train_starts_at=100,
+                                                 posterior_update_freq=5,
+                                                 lr=0.05)
 
     policies = [egp, ucbp, linucbp, lgtsp]
     policy_names = ["egp", "ucbp", "linucbp", "lgtsp"]
@@ -122,6 +147,9 @@ def run_cb(args):
     # simulate a bandit over n_rounds steps
     results = simulate_cb(samples, n_rounds, policies)
 
+    # results contains a list of dictionaries, one for each policy. Each of these dictionaries contains statistics
+    # associated with the results (e.g. regret for each time step) of running the corresponding policy with the given
+    # data.
     return results, policies, policy_names
 
 
@@ -130,22 +158,26 @@ def write_results_cb(results, policies, policy_names, trial_idx, args):
     """
     # log results
     cumreg_data = None
+
     acts_data = None
+
     for i in range(len(policies)):
         cr = results[i]["cum_regret"][:, None]
+
         if cumreg_data is None:
             cumreg_data = cr
         else:
-            cumreg_data = np.hstack( (cumreg_data, cr) )
+            cumreg_data = np.hstack((cumreg_data, cr))
 
         acts = results[i]["log"][0, :][:, None]
+
         if acts_data is None:
             acts_data = acts
         else:
-            acts_data = np.hstack( (acts_data, acts) )
+            acts_data = np.hstack((acts_data, acts))
 
     acts_opt = results[0]["log"][1, :][:, None]
-    acts_data = np.hstack( (acts_data, acts_opt) )
+    acts_data = np.hstack((acts_data, acts_opt))
 
     df = pd.DataFrame(cumreg_data, columns=policy_names)
     df.to_csv("{}/{}.cumreg.{}.csv".format(results_dir, args.task, trial_idx), header=True, index=False)
