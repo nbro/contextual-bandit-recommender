@@ -158,7 +158,7 @@ def run_cb(args):
                                                  lr=0.05)
 
     policies = [egp, ucbp, linucbp, lgtsp]
-    policy_names = ["egp", "ucbp", "linucbp", "lgtsp"]
+    policy_names = ["$\epsilon$-greedy", "UCB1", "LinUCB", "LinGaussianThompson"]
 
     # simulate a bandit over n_rounds steps
     results = simulate_contextual_bandit(samples, n_rounds, policies)

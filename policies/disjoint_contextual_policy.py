@@ -135,6 +135,7 @@ class LinUCBPolicy(ContextualPolicy):
             # Line 8 of algorithm 1.
             # TODO: use lstsq (https://numpy.org/doc/stable/reference/generated/numpy.linalg.lstsq.html) to handle
             #  over/under determined systems?
+            self.A_inv[a_t] = np.linalg.inv(self.A[a_t])
             self.theta[a_t] = self.A_inv[a_t].dot(self.b[a_t])
 
 
