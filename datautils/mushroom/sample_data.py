@@ -2,14 +2,13 @@ import numpy as np
 
 
 def sample_mushroom(X, y,
-                    n_mushrooms,
+                    n_mushrooms, # n_rounds (or time steps).
                     r_eat_good=5.0,
                     r_eat_bad_lucky=5.0,
                     r_eat_bad_unlucky=-35.0,
                     r_eat_bad_lucky_prob=0.5,
                     r_no_eat=0.0
                     ):
-
     """
     Ask for n samples of mushrooms.
 
@@ -23,7 +22,7 @@ def sample_mushroom(X, y,
                   The reward for eating a bad mushroom.
                   Then, come out a lucky break.
     r_eat_bad_unlucky : float
-                  The penality for eating a bad mushroom.
+                  The penalty for eating a bad mushroom.
     r_eat_bad_lucky_prob: float
                   The probability of avoiding the penalty.
     r_no_eat : float
@@ -33,7 +32,7 @@ def sample_mushroom(X, y,
     -------
     contexts : numpy array
                   Mushroom contexts.
-    r_acts : numpy array of size (n_mushrooms, n_actions)
+    r_acts : numpy array of size (n_mushrooms, num_actions)
                   A sampled reward table.
     opt_acts_hidden : numpy array
                   Optimal actions.
@@ -42,6 +41,10 @@ def sample_mushroom(X, y,
 
     """
     n, d = X.shape
+
+    # TODO: why are we randomly choosing which observations are poisonous?
+    #  We actually have the labels that tell us if a mushroom is edible or not, so we could use that?
+    # NOTE: choice can sample the same observation multiple times.
     indices = np.random.choice(np.arange(n), size=n_mushrooms)
 
     contexts = X[indices, :]
@@ -56,7 +59,7 @@ def sample_mushroom(X, y,
     r_eats += r_eat_good * is_edible_hidden
     # y_i == 0 ==> good
     r_eat_bad = np.random.choice([r_eat_bad_lucky, r_eat_bad_unlucky],
-                                 p=[r_eat_bad_lucky_prob, 1-r_eat_bad_lucky_prob],
+                                 p=[r_eat_bad_lucky_prob, 1 - r_eat_bad_lucky_prob],
                                  size=n_mushrooms)
     r_eats += r_eat_bad * is_poisonous_hidden
 
@@ -67,7 +70,7 @@ def sample_mushroom(X, y,
     # E[R_t,a | eat, bad], E[R_t,a | eat, good]
     # assume E[R_t,a | eat, good] > rest
     E_r_no_eat = r_no_eat
-    E_r_eat_bad = r_eat_bad_lucky * r_eat_bad_lucky_prob +\
+    E_r_eat_bad = r_eat_bad_lucky * r_eat_bad_lucky_prob + \
                   r_eat_bad_unlucky * (1 - r_eat_bad_lucky_prob)
 
     if E_r_no_eat > E_r_eat_bad:

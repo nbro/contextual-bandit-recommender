@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class BanditData(object):
     """
     - stores a sample per step
@@ -21,8 +22,7 @@ class BanditData(object):
         """
         epoch_len: number of batches
 
-        total number of samples
-        = epoch_len * batch_size
+        total number of samples = epoch_len * batch_size
         """
         n_samples, _ = self._D.shape
         indices = np.arange(n_samples)
@@ -33,14 +33,12 @@ class BanditData(object):
             batch_len = self._epoch_len
 
         for _ in range(batch_len):
-            indices = np.random.choice(indices,
-                                       size=self._batch_size,
-                                       replace=False)
+            indices = np.random.choice(indices, size=self._batch_size, replace=False)
+
             X = self._D[indices, :-1]
             y = self._D[indices, -1][:, None]
 
             yield (X, y)
-
 
     def sample_most_recent(self, size=None):
         n_samples, _ = self._D.shape
@@ -48,7 +46,6 @@ class BanditData(object):
             return self._D[-self._batch_size:, :]
         else:
             return self._D[-size:, :]
-
 
     def add_sample(self, x, y):
         """
@@ -58,11 +55,11 @@ class BanditData(object):
         if self._D is None:
             X = np.array(x).reshape(1, len(x))
             y = np.array(y).reshape(1, 1)
-            self._D = np.hstack( (X, y) )
+            self._D = np.hstack((X, y))
         else:
             assert np.isscalar(y)
-            sample = np.concatenate( (x, [y]) )
-            self._D = np.vstack( (self._D, sample) )
+            sample = np.concatenate((x, [y]))
+            self._D = np.vstack((self._D, sample))
 
         self._n_samples += 1
 
@@ -70,7 +67,5 @@ class BanditData(object):
     def n_samples(self):
         return self._n_samples
 
-
     def __len__(self):
         return self._n_samples
-

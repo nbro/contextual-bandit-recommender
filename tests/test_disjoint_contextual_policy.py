@@ -53,7 +53,7 @@ synthetic_data = get_synthetic_data()
 
 
 @pytest.mark.parametrize(
-        "n_samples, n_actions, context_dim, dataset",
+        "n_samples, num_actions, context_dimension, dataset",
         [synthetic_data, mushroom_data]
 )
 def test_linucb_policy(n_samples, n_actions, context_dim, dataset):
@@ -75,7 +75,7 @@ def test_linucb_policy(n_samples, n_actions, context_dim, dataset):
 
 
 @pytest.mark.parametrize(
-        "n_samples, n_actions, context_dim, dataset",
+        "n_samples, num_actions, context_dimension, dataset",
         [synthetic_data, mushroom_data]
 )
 def test_linear_gaussian_thompson_sampling_policy(

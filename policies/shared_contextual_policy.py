@@ -4,17 +4,19 @@ The policies that share parameters across all actions.
 The current implementations accept both user and item context.
 """
 
+import logging
 import sys
 
 import numpy as np
-from scipy.stats import invgamma
-
 import torch
 import torch.nn as nn
+from scipy.stats import invgamma
 from torch.autograd import Variable
 from torch.nn.utils import clip_grad_norm
 
-import logging
+from policies.utils import arbitrary_argmax
+
+# TODO: this looks like it could be in some utils.py
 logger = logging.getLogger(__name__ + "shared_contextual_policy")
 handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.DEBUG)
@@ -24,82 +26,86 @@ logger.addHandler(handler)
 
 
 class SharedLinUCBPolicy(object):
-    """LinUCB policy that shares parameters across all actions.
+    """LinUCB policy that shares parameters across all actions, i.e. only one theta for all actions. This is different
+    than algorithm 2 in "A Contextual-Bandit Approach to Personalized News Article Recommendation"
+    (2010, http://rob.schapire.net/papers/www10.pdf), given that algorithm 2 of that paper has both a set of shared
+    parameters as well as a set of separate/different parameters for each action."""
 
-    Note this is different from the hybrid model in [1].
+    def __init__(self, context_dimension, delta=0.2, updating_starts_at=500, update_frequency=50, batch_mode=False,
+                 batch_size=1024):
 
-    [1]: https://arxiv.org/pdf/1003.0146.pdf
-    """
-    def __init__(self, context_dim, delta=0.2,
-                 train_starts_at=500, train_freq=50,
-                 batch_mode=False, batch_size=1024
-                 ):
+        # +1 for the bias.
+        self.d = context_dimension + 1
 
-        # bias
-        self._d = context_dim + 1
+        # Only one A matrix that is shared across all actions.
+        self.A = np.identity(self.d)
 
-        # initialize with I_d, 0_d
-        self._A = np.identity(self._d)
-        # we will update this every train_freq
-        self._A_inv = np.linalg.inv(self._A)
+        self.A_inv = np.linalg.inv(self.A)
 
-        self._b = np.zeros(self._d)
-        self._theta = np.linalg.inv(self._A).dot(self._b)
+        # Only one vector of biases that is shared across all actions.
+        self.b = np.zeros(self.d)
 
-        self._alpha = 1 + np.sqrt(np.log(2/delta)/2)
+        # One vector of parameters that is shared across all actions.
+        self.theta = np.linalg.inv(self.A).dot(self.b)
 
-        self._t = 0
-        self._train_freq = train_freq
-        self._train_starts_at = train_starts_at
+        # See below equation 4 of the LinUCB paper.
+        self.alpha = 1 + np.sqrt(np.log(2 / delta) / 2)
+
+        self.t = 0
+
+        # These parameters are used in self.update to decide when to periodically update the parameters.
+        self.update_frequency = update_frequency
+        self.updating_starts_at = updating_starts_at
 
         # for computational efficiency
         # train on a random subset
-        self._batch_mode = batch_mode
-        self._batch_size = batch_size
+        self.batch_mode = batch_mode
+        self.batch_size = batch_size
 
-    def choose_action(self, x_t):
-        u_t, S_t = x_t
+    def action(self, x_t):
+        u_t, s_t = x_t
+
         # number of actions can change
-        n_actions = S_t.shape[0]
+        num_actions = s_t.shape[0]
 
         # estimate an action value
-        Q = np.zeros(n_actions)
-        ubc_t = np.zeros(n_actions)
+        q = np.zeros(num_actions)
+        ubc = np.zeros(num_actions)
 
-        for j in range(n_actions):
+        for action in range(num_actions):
             # compute input for each action
             # user_context + action_context + bias
-            x_t = np.concatenate( (u_t, S_t[j, :], [1]) )
-            assert len(x_t) == self._d
+            x_t = np.concatenate((u_t, s_t[action, :], [1]))
+            assert len(x_t) == self.d
 
-            # compute upper bound
-            k_ta = x_t.T.dot(self._A_inv).dot(x_t)
-            ubc_t[j] = self._alpha * np.sqrt(k_ta)
-            Q[j] = self._theta.dot(x_t) + ubc_t[j]
+            k = x_t.T.dot(self.A_inv).dot(x_t)
+            ubc[action] = self.alpha * np.sqrt(k)
 
-        a_t = np.argmax(Q)
+            q[action] = self.theta.dot(x_t) + ubc[action]
 
-        self._t += 1
+        a_t = arbitrary_argmax(q)
+
+        self.t += 1
 
         return a_t
 
     def update(self, a_t, x_t, r_t):
-        u_t, S_t = x_t
+        u_t, s_t = x_t
 
-        x_t = np.concatenate( (u_t, S_t[a_t, :], [1]) )
-        assert len(x_t) == self._d
+        x_t = np.concatenate((u_t, s_t[a_t, :], [1]))
+        assert len(x_t) == self.d
 
         # d x d
-        self._A += x_t.dot(x_t.T)
+        self.A += x_t.dot(x_t.T)
         # d x 1
-        self._b += r_t * x_t
+        self.b += r_t * x_t
 
-        if self._t < self._train_starts_at:
+        if self.t < self.updating_starts_at:
             return
 
-        if self._t % self._train_freq == 0:
-            self._A_inv = np.linalg.inv(self._A)
-            self._theta = self._A_inv.dot(self._b)
+        if self.t % self.update_frequency == 0:
+            self.A_inv = np.linalg.inv(self.A)
+            self.theta = self.A_inv.dot(self.b)
 
 
 class SharedLinearGaussianThompsonSamplingPolicy(object):
@@ -171,16 +177,15 @@ class SharedLinearGaussianThompsonSamplingPolicy(object):
         self._batch_size = batch_size
         self._lr = lr
 
-
     def _update_posterior(self, X_t, r_t_list):
         cov_t = np.linalg.inv(np.dot(X_t.T, X_t) + self._precision_0)
         mu_t = np.dot(cov_t, np.dot(X_t.T, r_t_list))
-        a_t = self._a_0 + self._t/2
+        a_t = self._a_0 + self._t / 2
 
         # mu_0 simplifies some terms
         r = np.dot(r_t_list, r_t_list)
         precision_t = np.linalg.inv(cov_t)
-        b_t = self._b_0 + 0.5*(r - np.dot(mu_t.T, np.dot(precision_t, mu_t)))
+        b_t = self._b_0 + 0.5 * (r - np.dot(mu_t.T, np.dot(precision_t, mu_t)))
 
         if self._batch_mode:
             # learn bit by bit
@@ -195,7 +200,6 @@ class SharedLinearGaussianThompsonSamplingPolicy(object):
             self._a = a_t
             self._b = b_t
 
-
     def _sample_posterior_predictive(self, x_t, n_samples=1):
         # 1. p(sigma^2)
         sigma_sq_t = invgamma.rvs(self._a, scale=self._b)
@@ -203,13 +207,13 @@ class SharedLinearGaussianThompsonSamplingPolicy(object):
         try:
             # p(w|sigma^2) = N(mu, sigam^2 * cov)
             w_t = np.random.multivariate_normal(
-                    self._mu, sigma_sq_t * self._cov
+                self._mu, sigma_sq_t * self._cov
             )
         except np.linalg.LinAlgError as e:
             logger.debug("Error in {}".format(type(self).__name__))
             logger.debug('Errors: {}.'.format(e.args[0]))
             w_t = np.random.multivariate_normal(
-                    np.zeros(self._d), np.eye(self._d)
+                np.zeros(self._d), np.eye(self._d)
             )
 
         # modify context
@@ -217,30 +221,29 @@ class SharedLinearGaussianThompsonSamplingPolicy(object):
         n_actions = S_t.shape[0]
 
         x_ta = [
-                np.concatenate( (u_t, S_t[j, :], [1]) )
-                for j in range(n_actions)
+            np.concatenate((u_t, S_t[j, :], [1]))
+            for j in range(n_actions)
         ]
         assert len(x_ta[0]) == self._d
 
         # 2. p(r_new | params)
         mean_t_predictive = [
-                np.dot(w_t, x_ta[j])
-                for j in range(n_actions)
+            np.dot(w_t, x_ta[j])
+            for j in range(n_actions)
         ]
 
         cov_t_predictive = sigma_sq_t * np.eye(n_actions)
         r_t_estimates = np.random.multivariate_normal(
-                            mean_t_predictive,
-                            cov=cov_t_predictive, size=1
-                        )
+            mean_t_predictive,
+            cov=cov_t_predictive, size=1
+        )
         r_t_estimates = r_t_estimates.squeeze()
 
         assert r_t_estimates.shape[0] == n_actions
 
         return r_t_estimates
 
-
-    def choose_action(self, x_t):
+    def action(self, x_t):
         # p(R_new | params_t)
         r_t_estimates = self._sample_posterior_predictive(x_t)
         act = np.argmax(r_t_estimates)
@@ -249,10 +252,9 @@ class SharedLinearGaussianThompsonSamplingPolicy(object):
 
         return act
 
-
     def update(self, a_t, x_t, r_t):
         u_t, S_t = x_t
-        x_t = np.concatenate( (u_t, S_t[a_t, :], [1]) )
+        x_t = np.concatenate((u_t, S_t[a_t, :], [1]))
 
         # add a new data point
         if self._X_t is None:
@@ -261,8 +263,8 @@ class SharedLinearGaussianThompsonSamplingPolicy(object):
         else:
             X_t, r_t_list = self._train_data[a_t]
             n = X_t.shape[0]
-            X_t = np.vstack( (X_t, x_t))
-            assert X_t.shape[0] == (n+1)
+            X_t = np.vstack((X_t, x_t))
+            assert X_t.shape[0] == (n + 1)
             assert X_t.shape[1] == self._d
             r_t_list = np.append(r_t_list, r_t)
 
@@ -300,20 +302,21 @@ class FeedForwardNetwork(nn.Module):
 
     [1]: https://arxiv.org/abs/1511.06807
     """
+
     def __init__(self, input_dim,
-                       hidden_dim,
-                       output_dim,
-                       n_layer,
-                       learning_rate,
-                       set_gpu,
-                       grad_noise,
-                       gamma,
-                       eta,
-                       grad_clip,
-                       grad_clip_norm,
-                       grad_clip_value,
-                       weight_decay,
-                       debug):
+                 hidden_dim,
+                 output_dim,
+                 n_layer,
+                 learning_rate,
+                 set_gpu,
+                 grad_noise,
+                 gamma,
+                 eta,
+                 grad_clip,
+                 grad_clip_norm,
+                 grad_clip_value,
+                 weight_decay,
+                 debug):
         super().__init__()
 
         self.input_dim = input_dim
@@ -323,8 +326,8 @@ class FeedForwardNetwork(nn.Module):
         self.model = nn.Sequential()
         self.model.add_module("input", nn.Linear(input_dim, hidden_dim))
         for i in range(n_layer - 1):
-            self.model.add_module("fc{}".format(i+1), nn.Linear(hidden_dim, hidden_dim))
-            self.model.add_module("relu{}".format(i+1), nn.ReLU())
+            self.model.add_module("fc{}".format(i + 1), nn.Linear(hidden_dim, hidden_dim))
+            self.model.add_module("relu{}".format(i + 1), nn.ReLU())
         self.model.add_module("fc{}".format(n_layer), nn.Linear(hidden_dim, output_dim))
 
         self.set_gpu = set_gpu
@@ -365,12 +368,10 @@ class FeedForwardNetwork(nn.Module):
         self._grad_clip_norm = grad_clip_norm
         self._grad_clip_value = grad_clip_value
 
-
     def predict(self, x):
         self.model.eval()
         data = Variable(x).to(self.device)
         return self.model(data)
-
 
     def train(self, epoch, train_loader):
         self.model.train()
@@ -380,7 +381,6 @@ class FeedForwardNetwork(nn.Module):
         batches = train_loader.sample_batches()
 
         for batch_idx, (data, target) in enumerate(batches):
-
 
             # @todo: refactor this
             # type cast to match the default dtype of torch
@@ -433,13 +433,11 @@ class FeedForwardNetwork(nn.Module):
 
         sys.stdout.flush()
 
-        return total_loss/len(train_loader)
-
+        return total_loss / len(train_loader)
 
     def _compute_grad_noise(self, grad):
-        std = np.sqrt(self._eta / (1 + self._step)**self._gamma)
+        std = np.sqrt(self._eta / (1 + self._step) ** self._gamma)
         return Variable(grad.data.new(grad.size()).normal_(0, std=std))
-
 
     def add_grad_noise(self, module, grad_i_t, grad_o):
         _, _, grad_i = grad_i_t[0], grad_i_t[1], grad_i_t[2]
@@ -453,6 +451,7 @@ class SharedNeuralPolicy(object):
     For exploration, the epsilon greedy logic is set.
 
     """
+
     def __init__(self,
                  model,
                  dataloader,
@@ -472,8 +471,7 @@ class SharedNeuralPolicy(object):
         self._eps = eps
         self._eps_anneal_factor = eps_anneal_factor
 
-
-    def choose_action(self, x_t):
+    def action(self, x_t):
         # make x_t -> x_ta
         u_t, S_t = x_t
         n_actions = S_t.shape[0]
@@ -482,7 +480,7 @@ class SharedNeuralPolicy(object):
         # j x |u_t|
         U_t = np.tile(u_t, (n_actions, 1))
         # j x (|u_t| + |s_t|)
-        X_ta = np.hstack( (U_t, S_t) )
+        X_ta = np.hstack((U_t, S_t))
         X_ta = torch.from_numpy(X_ta)
         # type cast to match the default dtype of torch
         X_ta = X_ta.float()
@@ -503,14 +501,13 @@ class SharedNeuralPolicy(object):
             a_t = np.random.choice(np.arange(n_actions))
 
         # anneal eps
-        self._eps *= (1 - self._eps_anneal_factor)**self._t
+        self._eps *= (1 - self._eps_anneal_factor) ** self._t
 
         return a_t
 
-
     def update(self, a_t, x_t, r_t):
         u_t, S_t = x_t
-        x_ta = np.concatenate( (u_t, S_t[a_t, :]) )
+        x_ta = np.concatenate((u_t, S_t[a_t, :]))
 
         self._dataloader.add_sample(x_ta, r_t)
         self._t += 1

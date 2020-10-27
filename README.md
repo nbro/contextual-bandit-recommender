@@ -1,57 +1,46 @@
 [![Build Status](https://travis-ci.com/dhfromkorea/contextual-bandit-recommender.svg?token=LpCqnxSYFM2Cg2x3ixjz&branch=master)](https://travis-ci.com/dhfromkorea/contextual-bandit-recommender)
 
-# Recommendater System with Contextual Bandit Algorithms
+# Context-free and contextual bandit algorithms for item recommendation
 
-This repo contains a work-in-progress code for the implementations of commmon contextual bandit algorithms. Check out the [blogpost](http://www.dhfromkorea.com/news-recommendation-with-contextual-bandit/) for the details.
+# How to download the dataset?
 
-Note this project is fresh and totally work in progress. 
-
-## Getting Started
-
-
-### Prerequisites
-Built for python 3.5+. 
-```
-numpy==1.16.4
-pandas==0.25.0
-scikit-learn==0.21.2
-scipy==1.3.0
-seaborn==0.9.0
-sklearn==0.0
-torch==1.1.0
-```
-
-To install prerequisites, preferably in a virtualenv or similiar.
-```
-make init
-```
-### Running
-
-First fetch the data
+Before training any context-free or contextual bandit agent, you need to download the dataset that is used to train it. Specifically, we will use the [mushrooms](https://archive.ics.uci.edu/ml/datasets/mushroom) dataset, which can be downloaded as follows (provided you have `curl` installed)
 
 ```
-make fetch-data
+curl https://archive.ics.uci.edu/ml/machine-learning-databases/mushroom/agaricus-lepiota.data -o ./datautils/mushroom/mushroom.csv
 ```
 
-Then you can can `main.py` as follows (maybe you may also want to change the experiment parameters in the `Makefile` file)
+So, the mushrooms dataset will be downloaded into the folder `./datautils/mushroom/` and it will be called `./datautils/mushroom/mushroom.csv`. You can find more information about this dataset at https://archive.ics.uci.edu/ml/datasets/mushroom.
 
-```
-make run
-```
+### How to install the required packages?
 
-or tune the hyperparameters yourself (check the args in `main.py`). 
+To run the experiments, you need to install a few required packages, which you can do as follows
 
-```
-python main.py "synthetic" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS)
-python main.py "mushroom" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS)
-python main.py "news" --n_trials $(N_TRIALS) --n_rounds $(N_ROUNDS) --is_acp --grad_clip
-```
+    pip install -r requirements.txt
 
-The experiment outputs are written to `results/`.
+### How to run the experiments?
 
-To plot the results, run `make plot`.
+To run the experiments on the mushrooms dataset, you can execute the following command
 
-### Available Algorithms
+    python main.py "mushroom" --n_trials 10 --n_rounds 100
+    
+where `n_rounds` is the number of time steps (iterations) that the bandit algorithm runs for and `n_trials` is the number of times the same experiments is run for.
+
+The results of the experiments are written to the folder `results/`.
+
+### Hyper-parameters
+
+In the [`main.py`](./main.py), you can see that there are other hyper-parameters that can be set or re-set.
+
+
+### How to plot the results?
+
+To plot the results, run the following command
+
+    python evaluations/plotting.py "mushroom" --n_trials 10 --window 512
+
+### Available context-free and contextual bandit algorithms/agents
+
 * LinUCB: Linear UCB algorithm (modified [1]).
 * Thompson Sampling: Linear Gaussian with a conjugate prior [2].
 * Neural Network Policy: A fully-connected neural network with gradient noise.
@@ -60,87 +49,29 @@ To plot the results, run `make plot`.
 * Sample Mean Policy
 * Random Policy
 
+#### Results
 
-### Demos
-Check out the [blogpost](http://www.dhfromkorea.com/news-recommendation-with-contextual-bandit/) for the details about the datasets
+Here is an example of the plots of the results of an experiment on the mushrooms dataset.
 
-
-#### Mushroom Dataset
-
-A public UCI machine learning [dataset](https://archive.ics.uci.edu/ml/datasets/mushroom). 
-
-```python
-
-# set up a contextual bandit problem
-X, y = load_data(name="mushroom")
-context_dim = 117
-n_actions = 2
-
-samples = sample_mushroom(X,
-                          y,
-                          n_rounds,
-                          r_eat_good=10.0,
-                          r_eat_bad_lucky=10.0,
-                          r_eat_bad_unlucky=-50.0,
-                          r_eat_bad_lucky_prob=0.7,
-                          r_no_eat=0.0
-                          )
-# instantiate policies
-egp = EpsilonGreedyPolicy(n_actions, lr=0.001,
-                epsilon=0.5, eps_anneal_factor=0.001)
-
-ucbp = UCBPolicy(n_actions=n_actions, lr=0.001)
-
-linucbp = LinUCBPolicy(
-        n_actions=n_actions,
-        context_dim=context_dim,
-        delta=0.001,
-        train_starts_at=100,
-        train_freq=5
-        )
-
-lgtsp = LinearGaussianThompsonSamplingPolicy(
-            n_actions=n_actions,
-            context_dim=context_dim,
-            eta_prior=6.0,
-            lambda_prior=0.25,
-            train_starts_at=100,
-            posterior_update_freq=5,
-            lr = 0.05)
-
-policies = [egp, ucbp, linucbp, lgtsp]
-policy_names = ["egp", "ucbp", "linucbp", "lgtsp"]
-
-# simulate a bandit over n_rounds steps
-results = simulate_cb(samples, n_rounds, policies)
-```
 ![Mushroom Cum Reg](http://www.dhfromkorea.com/images/cb/mushroom.cumreg.png)
 
 ![Mushroom Action Distribution](http://www.dhfromkorea.com/images/cb/mushroom.acts.png)
 
 
 #### Synthetic Dataset
-Available built-in.
+
+Here's for a synthetic dataset.
 
 ![Synthetic Cum Reg](http://www.dhfromkorea.com/images/cb/synthetic.cumreg.png)
 
 ![Synthetic Action Distribution](http://www.dhfromkorea.com/images/cb/synthetic.acts.png)
 
+### Terminology
 
+- [Click-through rate](https://en.wikipedia.org/wiki/Click-through_rate)
+- Regret
+- Reward
 
-#### Yahoo Front Page Click Log Dataset
-
-You need to make a request to gain access. For necessary data preprocessing, check out `datautils.news.db_tools`.
-
-![News Cum Reg](http://www.dhfromkorea.com/images/cb/news.cumrew.png)
-
-![News Action Distribution](http://www.dhfromkorea.com/images/cb/news.CTR.png)
-
-
-### Running the tests
-```
-make test
-```
 
 [1]: http://rob.schapire.net/papers/www10.pdf
 [2]: https://en.wikipedia.org/wiki/Bayesian_linear_regression

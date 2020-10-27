@@ -120,3 +120,7 @@ venv.bak/
 .mypy_cache/
 
 .idea
+
+datautils/news/v1/R6
+
+*.DS_Store*

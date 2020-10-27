@@ -3,7 +3,7 @@ import numpy as np
 
 def sample_synthetic(n_samples, n_actions=5, context_dim=10, sigma=1.0):
     """
-    W ~ samples hidden random Matrix of n_actions x context_dim
+    W ~ samples hidden random Matrix of num_actions x context_dimension
     x_t ~ samples contexts uniformly from {-5, -4, ..., 4, 5}
     r_t ~ samples rewards from an isotropic multivariate normal
           r_t ~ N(W x_t, sigma^2 I)
@@ -17,7 +17,7 @@ def sample_synthetic(n_samples, n_actions=5, context_dim=10, sigma=1.0):
 
     np.random.seed(0)
     W = np.random.rand(n_actions, context_dim)
-    cov = sigma**2 * np.eye(n_actions)
+    cov = sigma ** 2 * np.eye(n_actions)
 
     x_t_list = []
     r_acts_list = []
@@ -38,5 +38,3 @@ def sample_synthetic(n_samples, n_actions=5, context_dim=10, sigma=1.0):
         mean_list_hidden.append(mean)
 
     return x_t_list, r_acts_list, opt_act_list_hidden, mean_list_hidden
-
-

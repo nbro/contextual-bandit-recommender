@@ -1,12 +1,13 @@
 import os
 from subprocess import Popen
 
-
 import numpy as np
 
 news_data_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "v1"))
 
 ARTICLE_POOL_LENGTH = 20
+
+
 # ARTICLE_POOL remains the same
 
 
@@ -21,7 +22,7 @@ def parse_uv_event(user_visit):
         tokens = user_visit.strip().split(" ")
         uv_event["timestamp"] = tokens[0]
         uv_event["displayed_article_id"] = int(tokens[1])
-        uv_event["is_clicked"]  = int(tokens[2])
+        uv_event["is_clicked"] = int(tokens[2])
 
         uv_event["user"] = {}
 
@@ -31,7 +32,7 @@ def parse_uv_event(user_visit):
 
             for user_feature in tokens[4:10]:
                 feature_id, feature_val = user_feature.split(":")
-                uv_event["user"][int(feature_id)-1] = float(feature_val)
+                uv_event["user"][int(feature_id) - 1] = float(feature_val)
         else:
             raise Exception("unexpected marker: {}".format(user_marker))
 
@@ -44,9 +45,9 @@ def parse_uv_event(user_visit):
                 # assumes pos int
                 article_id = int(article_marker[1:])
                 uv_event["article"][article_id] = [None] * n_features
-                for article_feature in tokens[i+1:i+7]:
+                for article_feature in tokens[i + 1:i + 7]:
                     feature_id, feature_val = article_feature.split(":")
-                    uv_event["article"][article_id][int(feature_id)-1] = float(feature_val)
+                    uv_event["article"][article_id][int(feature_id) - 1] = float(feature_val)
             else:
                 raise Exception("unexpected marker: {}".format(article_marker))
             i += 7
@@ -63,7 +64,9 @@ def extract_data():
     """Extracts news data.
     """
     from glob import glob
+
     compressed = glob(os.path.join(news_data_path, "*.gz"))
+
     for path in compressed:
         # if already extracted, ignore
         if os.path.exists(os.path.splitext(path)[0]):

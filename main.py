@@ -7,7 +7,7 @@ import sys
 import time
 
 from environments.runner_cb import run_cb, write_results_cb
-from environments.runner_por_cb import run_por_cb, write_results_por_cb
+from environments.runner_partially_observable_cb import run_partially_observable_cb, write_results_por_cb
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -28,14 +28,15 @@ logger.addHandler(handler)
 def arg_parser():
     parser = argparse.ArgumentParser()
 
+    # TODO: news does not seem to be implemented
     TASK_LIST = ["mushroom", "synthetic", "news"]
 
     parser.add_argument("task", type=str, choices=TASK_LIST)
     parser.add_argument("--n_trials", type=int, default=1, help="number of independent trials for experiments")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n_rounds", type=int, default=1000)
-    parser.add_argument("--train_starts_at", type=int, default=500)
-    parser.add_argument("--train_freq", type=int, default=64)
+    parser.add_argument("--updating_starts_at", type=int, default=500)
+    parser.add_argument("--update_frequency", type=int, default=64)
     parser.add_argument("--is_acp", action="store_true", help="whether the task is an action context problem")
 
     # neural network stuff
@@ -70,7 +71,7 @@ if __name__ == "__main__":
         start_t = time.time()
 
         if args.is_acp:
-            results, policies, policy_names = run_por_cb(args)
+            results, policies, policy_names = run_partially_observable_cb(args)
             write_results_por_cb(results, policies, policy_names, trial_idx, args)
         else:
             # cb = contextual bandits

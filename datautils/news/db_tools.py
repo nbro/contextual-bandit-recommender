@@ -12,10 +12,9 @@ User (one)---- (many) UserVisitEvent (one; displayed)-----------(many) Article
                       Shortlist           (many) ---------(one) ShortlistArticle
 """
 
-from datetime import datetime
-
-import sys
 import logging
+import sys
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
@@ -24,19 +23,18 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-
 from sqlalchemy import (
-        MetaData,
-        create_engine,
-        Column,
-        Integer,
-        Float,
-        DateTime,
-        ForeignKey,
+    MetaData,
+    create_engine,
+    Column,
+    Integer,
+    Float,
+    DateTime,
+    ForeignKey,
 )
 from sqlalchemy.orm import (
-        relationship,
-        sessionmaker,
+    relationship,
+    sessionmaker,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from datautils.news.sample_data import read_user_event, parse_uv_event, extract_data
@@ -197,13 +195,11 @@ class DBHelper(object):
                                   datetime=date_time)
         self._session.add(uv_event)
 
-
     @property
     def users(self):
         q = self._session.query
         users = q(User).all()
         return users
-
 
     @property
     def articles(self):
@@ -211,13 +207,11 @@ class DBHelper(object):
         articles = q(Article).all()
         return articles
 
-
     @property
     def events(self):
         q = self._session.query
         uv_events = q(UserVisitEvent).all()
         return uv_events
-
 
     def reset_all_data(self):
         for tb in self._meta.sorted_tables:
@@ -232,7 +226,6 @@ class DBHelperBulk(object):
     def __init__(self):
         engine = create_engine("sqlite:///{}".format(self.DB_NAME))
         self._engine = engine
-
 
         # get table metadata
         meta = MetaData(bind=engine)
@@ -260,7 +253,6 @@ class DBHelperBulk(object):
             articles = q(Article).all()
             for article in articles:
                 self._articles.add(article.id)
-
 
     def write_user_event(self, parsed_uv_list):
         users = []
@@ -318,7 +310,7 @@ class DBHelperBulk(object):
                 shortlist = Shortlist()
 
                 shortlists.append(shortlist)
-                shortlist_articles_raw.append( (shortlist, cur_shortlist) )
+                shortlist_articles_raw.append((shortlist, cur_shortlist))
 
         self._session.bulk_save_objects(shortlists, return_defaults=True)
 
@@ -354,13 +346,11 @@ class DBHelperBulk(object):
 
         self._session.flush()
 
-
     @property
     def users(self):
         q = self._session.query
         users = q(User).all()
         return users
-
 
     @property
     def articles(self):
@@ -368,20 +358,17 @@ class DBHelperBulk(object):
         articles = q(Article).all()
         return articles
 
-
     @property
     def events(self):
         q = self._session.query
         uv_events = q(UserVisitEvent).all()
         return uv_events
 
-
     def reset_all_data(self):
         for tb in self._meta.sorted_tables:
             print("clear table: {}".format(tb))
             self._session.execute(tb.delete())
         self._session.commit()
-
 
     def reset_all_tables(self):
         for tb in self._meta.sorted_tables:
@@ -390,8 +377,7 @@ class DBHelperBulk(object):
 
 
 def main():
-    """Sequential inserts to db.
-    """
+    """Sequential inserts to db."""
 
     dbh = DBHelper()
     dbh.reset_all_data()
@@ -422,7 +408,7 @@ def main():
             dbh.write_user_event(uv)
             i += 1
 
-            if i > 6 * 10**5:
+            if i > 6 * 10 ** 5:
                 break
 
         except StopIteration:
@@ -478,8 +464,8 @@ def main_bulk():
 if __name__ == "__main__":
     logger.info("Exctrating Yahoo Click Log data has started.")
     extract_data()
+    input("...")
     logger.info("Writing Yahoo Click Log data to db has started.")
     main()
     logger.info("Writing Yahoo Click Log data to db has fished.")
-    #main_bulk()
-
+    # main_bulk()
